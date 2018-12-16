@@ -24,13 +24,17 @@
    - Ipython-console (Open Anaconda-Prompt and issue command ```ipython```)
 
 ## Packages
+Install packages from within Anaconda-Prompt
+
 ### pptx
-Simplified Powerpoint-API
+Simplified Powerpoint-API.
+Installation of Powerpoint is **not** needed.
 
     conda install -c conda-forge python-pptx
 
 ### pywin32com
-Python wrapper for official API
+Python wrapper for official API.
+A valid installation of Powerpoint is necessary.
 
     conda install -c anaconda pywin32
 
