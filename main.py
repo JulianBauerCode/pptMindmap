@@ -10,12 +10,12 @@ class Interaction(object):
         # self.labelTo = None
         # self.labelFrom = None
         # self.labelWith = None
-        
+
     def __init__(self):
         self.labelTo = None
         self.labelFrom = None
         self.labelWith = None
-        
+
     def addTo(self, label):
         self.labelTo = label
 
@@ -24,7 +24,7 @@ class Interaction(object):
 
     def addWith(self, label):
         self.labelWith = label
-    
+
     def __repr__(self,):
         repr = ''
         for key, value in self.__dict__.items():
@@ -86,6 +86,141 @@ import os
 import numpy as np
 
 
+class ConnectionGraph(object):
+
+    pointsPerCm = 28.35
+
+    def __init__(self, slide, centralLabel, centralCoords, interactions, sizesDict_centralKids_WidthHeight):
+        self.slide = slide
+        self.centralLabel = centralLabel
+        self.centralCoords = self.dictValuesFromCentimeterToPoint(
+                                    d=centralCoords,
+                                    )
+        self.interactions = interactions
+        self.interactionKeys = interactions.keys()  # Do not rely on order of dicts
+        self.sizes = self.dictValuesFromCentimeterToPoint(
+                        d=sizesDict_centralKids_WidthHeight,
+                        )
+        self.centralShape = None
+        self.kidShape = {}
+
+    def dictValuesFromCentimeterToPoint(self, d):
+        '''Multiply all values of dict which are numbers by pointsPerCm
+        '''
+        from numbers import Number
+        from collections import Mapping
+        for k, v in d.items():
+            if isinstance(v, Mapping):
+                self.dictValuesFromCentimeterToPoint(v)
+            elif isinstance(v, Number):
+                d[k] = v * self.pointsPerCm
+        return d
+
+    def drawcentral(self,):
+        width = self.sizes['central']['width']
+        height = self.sizes['central']['height']
+        box = self.slide.Shapes.AddTextbox(
+            Orientation=1,  # msoTextOrientationHorizontal
+            Left=self.centralCoords['x']-width/2.0,
+            Top=self.centralCoords['y']-height/2.0,
+            Width=width,
+            Height=height,
+            )
+        box.TextFrame.TextRange.Text = self.centralLabel
+        box.TextEffect.Alignment = 2    # centered
+        box.Line.Weight = 3
+        box.Line.ForeColor.RGB = self.hexToInt('000000')
+        self.centralShape = box
+
+    def setRadius(self, radius):
+        self.radius = float(radius) * self.pointsPerCm
+
+    def drawKids(self,):
+        width = self.sizes['kids']['width']
+        height = self.sizes['kids']['height']
+
+        for counter, kidKey in enumerate(self.interactionKeys):
+            print(kidKey)
+            center = self.centerOfKid(counter)
+            box = self.slide.Shapes.AddTextbox(
+                Orientation=1,  # msoTextOrientationHorizontal
+                Left=center['x']-width/2.0,
+                Top=center['y']-height/2.0,
+                Width=width,
+                Height=height,
+                )
+            box.TextFrame.TextRange.Text = kidKey
+            box.TextEffect.Alignment = 2    # centered
+            box.Line.Weight = 3
+            box.Line.ForeColor.RGB = self.hexToInt('000000')
+            self.kidShape[kidKey] = box
+
+    def xyByPolar(self, radius, angle):
+        angle = np.deg2rad(angle)
+        pos = {}
+        pos['x'] = radius * np.cos(angle)
+        pos['y'] = radius * np.sin(angle)
+        return pos
+
+    def centerOfKid(self, counter):
+        nbrKids = len(self.interactionKeys)
+        angleIncrement = 360.0 / float(nbrKids)
+        angle = counter * angleIncrement
+        offset = self.xyByPolar(self.radius, angle)
+        center = {}
+        center['x'] = self.centralCoords['x'] + offset['x']
+        center['y'] = self.centralCoords['y'] + offset['y']
+        return center
+
+    # def drawArrows(self,):
+        # for counter, kidKey in enumerate(self.interactionKeys):
+            # centerKid = self.centerOfKid(counter)
+            # kidValue = self.interactions[kidKey]
+            # arrow = self.slide.Shapes.AddLine(
+                # BeginX=self.centralCoords['x'],
+                # BeginY=self.centralCoords['y'],
+                # EndX=centerKid['x'],
+                # EndY=centerKid['y'],
+                # ).line
+            # arrow.ForeColor.RGB = self.hexToInt('000000')
+
+    def hexToInt(self, hexString):
+        # Choose Hex-color: https://www.rapidtables.com/web/color/RGB_Color.html
+        h = hexString.lstrip('#')
+        rgb = tuple(int(h[i:i+2], 16) for i in (0, 2 ,4))
+        colorInt = rgb[0] + (rgb[1] * 256) + (rgb[2] * 256 * 256)
+        return colorInt
+
+    def connect(self,):
+        for counter, kidKey in enumerate(self.interactionKeys):
+            connector = self.slide.Shapes.AddConnector(
+                Type=1, # msoConnectorStraight
+                BeginX=0,
+                BeginY=0,
+                EndX=0,
+                EndY=0
+                )
+            connector.ConnectorFormat.BeginConnect(
+                ConnectedShape=self.centralShape,
+                ConnectionSite=1,
+                )
+            connector.ConnectorFormat.EndConnect(
+                ConnectedShape=self.kidShape[kidKey],
+                ConnectionSite=1,
+                )
+            connector.ConnectorFormat.Parent.RerouteConnections()
+            connector.Line.ForeColor.RGB = self.hexToInt('000000')
+            connector.Line.BeginArrowheadStyle = 3
+            connector.Line.EndArrowheadStyle = 3
+            connector.Line.BeginArrowheadLength = 2
+            connector.Line.EndArrowheadLength = 2
+
+            # Choose Hex-color: https://www.rapidtables.com/web/color/RGB_Color.html
+
+
+    def drawLabels(self,):
+        pass
+
 fileName = 'graph.pptx'
 filePath = os.path.join(os.getcwd(), fileName)
 
@@ -101,100 +236,30 @@ p = app.Presentations.Open(
                         WithWindow=False,
                         ReadOnly=False,
                         )
-s = p.slides[0]
+layoutSlide = p.slides[0].CustomLayout
 
-class ConnectionGraph(object):
-
-    pointsPerCm = 28.35
-
-    def __init__(self, slide, centralLabel, centralCoords, interactions, sizesDict_centralKids_WidthHeight):
-        self.slide = slide
-        self.centralLabel = centralLabel
-        self.centralCoords = [item * self.pointsPerCm for item in centralCoords]
-        self.interactions = interactions
-        self.sizes = self.dictValuesFromCentimeterToPoint(
-                        d=sizesDict_centralKids_WidthHeight,
-                        pointsPerCm=self.pointsPerCm,
-                        )
-
-    def dictValuesFromCentimeterToPoint(self, d, pointsPerCm):
-        '''Multiply all values of dict which are numbers by pointsPerCm
-        '''
-        from numbers import Number
-        from collections import Mapping
-        for k, v in d.items():
-            if isinstance(v, Mapping):
-                self.dictValuesFromCentimeterToPoint(v, pointsPerCm)
-            elif isinstance(v, Number):
-                d[k] = v * pointsPerCm
-        return d
-
-    def xyByPolar(self, radius, angle):
-        angle = np.deg2rad(angle)
-        return (radius * np.cos(angle), radius * np.sin(angle))
-
-    def drawcentral(self,):
-        width = self.sizes['central']['width']
-        height = self.sizes['central']['height']
-        box = self.slide.Shapes.AddTextbox(
-            Orientation=1,# msoTextOrientationHorizontal
-            Left=self.centralCoords[0]-width/2.0,
-            Top=self.centralCoords[1]-height/2.0,
-            Width=width,
-            Height=height,
-            )
-        box.TextFrame.TextRange.Text = self.centralLabel
-        box.TextEffect.Alignment = 2    # centered
-
-    def drawKids(self,):
-        width = self.sizes['kids']['width']
-        height = self.sizes['kids']['height']
-        nbrKids = len(self.interactions)
-        angleIncrement = 360.0 / float(nbrKids)
-        radius = 2.0 * self.pointsPerCm
-
-        # for kidKey, kidValue in self.interactions.items():
-        kidKey, kidValue = list(self.interactions.items())[0]
-        print(kidValue)
-        angle = angleIncrement * 0
-        coords = self.xyByPolar(radius, angle)
-        box = self.slide.Shapes.AddTextbox(
-            Orientation=1,# msoTextOrientationHorizontal
-            Left=self.centralCoords[0] + coords[0]-width/2.0,
-            Top=self.centralCoords[1] + coords[1]-height/2.0,
-            Width=width,
-            Height=height,
-            )
-        box.TextFrame.TextRange.Text = kidKey
-        box.TextEffect.Alignment = 2    # centered
-
-    def drawToLabels(self,):
-        pass
-
-    def drawFromLabels(self,):
-        pass
-
-    def drawWithLabels(self,):
-        pass
-
-g = ConnectionGraph(
-        slide=s,
-        centralLabel='S1',
-        centralCoords=(slideWidth/2.0, slideHeight/2.0),
-        interactions=interactions['S1'],
-        sizesDict_centralKids_WidthHeight={
-            'central':{
-                'width':2,  # cm
-                'height':1, # cm
+for keyInteract, valueInteract in interactions.items():
+    g = ConnectionGraph(
+            slide=p.slides.AddSlide(1, layoutSlide),
+            # Layouts: https://docs.microsoft.com/de-de/office/vba/api/PowerPoint.PpSlideLayout
+            centralLabel=keyInteract,
+            centralCoords={'x':slideWidth/2.0, 'y':slideHeight/2.0},
+            interactions=valueInteract,
+            sizesDict_centralKids_WidthHeight={
+                'central':{
+                    'width':2,  # cm
+                    'height':1, # cm
+                    },
+                'kids':{
+                    'width':2,  # cm
+                    'height':1, # cm
+                    },
                 },
-            'kids':{
-                'width':2,  # cm
-                'height':1, # cm
-                },
-            },
-        )
-g.drawcentral()
-g.drawKids()
+            )
+    g.drawcentral()
+    g.setRadius(radius = 10.0)  # cm
+    g.drawKids()
+    g.connect()
 
 # p.Save()
 p.SaveAs(filePath+'test')

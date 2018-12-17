@@ -1,17 +1,34 @@
 # Todo
 
- - create new presentation
- - create new slide
- - create textbox
+ - Add labels to connector
+ - use styles from existing slides
+    - textboxes
+        - central
+        - kids
+    - arrows
+        - only label to
+        - only label from 
+        - else
+ - Define arrow heads of connector depending on labels
+    - only label to
+    - only label from 
+    - else
+ - Write Documentation and instructions
+
+# Done
+ - draw all together
  - create create arrow
+ - create textbox
+ - create new slide
+ - create new presentation
+
+# Do not
  - calc positions
    - relative to center
    - of centered textbox
    - of textboxes
    - of interaction arrows
    - of cooperation arrows
- - draw all together
- - use textbox style from existing presentation
 
 ##############################################
 # Install
