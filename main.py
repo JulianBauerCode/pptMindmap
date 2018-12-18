@@ -103,6 +103,7 @@ class ConnectionGraph(object):
                         )
         self.centralShape = None
         self.kidShape = {}
+        self.labelShape = {}
 
     def dictValuesFromCentimeterToPoint(self, d):
         '''Multiply all values of dict which are numbers by pointsPerCm
@@ -132,16 +133,18 @@ class ConnectionGraph(object):
         box.Line.ForeColor.RGB = self.hexToInt('000000')
         self.centralShape = box
 
-    def setRadius(self, radius):
-        self.radius = float(radius) * self.pointsPerCm
+    def setradiusKids(self, radius):
+        self.radiusKids = float(radius) * self.pointsPerCm
+
+    def setradiusLabels(self, radius):
+        self.radiusLabels = float(radius) * self.pointsPerCm
 
     def drawKids(self,):
         width = self.sizes['kids']['width']
         height = self.sizes['kids']['height']
 
         for counter, kidKey in enumerate(self.interactionKeys):
-            print(kidKey)
-            center = self.centerOfKid(counter)
+            center = self.calcCenter(counter, self.radiusKids)
             box = self.slide.Shapes.AddTextbox(
                 Orientation=1,  # msoTextOrientationHorizontal
                 Left=center['x']-width/2.0,
@@ -162,11 +165,11 @@ class ConnectionGraph(object):
         pos['y'] = radius * np.sin(angle)
         return pos
 
-    def centerOfKid(self, counter):
+    def calcCenter(self, counter, radius):
         nbrKids = len(self.interactionKeys)
         angleIncrement = 360.0 / float(nbrKids)
         angle = counter * angleIncrement
-        offset = self.xyByPolar(self.radius, angle)
+        offset = self.xyByPolar(radius, angle)
         center = {}
         center['x'] = self.centralCoords['x'] + offset['x']
         center['y'] = self.centralCoords['y'] + offset['y']
@@ -174,7 +177,7 @@ class ConnectionGraph(object):
 
     # def drawArrows(self,):
         # for counter, kidKey in enumerate(self.interactionKeys):
-            # centerKid = self.centerOfKid(counter)
+            # centerKid = self.calcCenter(counter, self.radiusKids)
             # kidValue = self.interactions[kidKey]
             # arrow = self.slide.Shapes.AddLine(
                 # BeginX=self.centralCoords['x'],
@@ -191,43 +194,77 @@ class ConnectionGraph(object):
         colorInt = rgb[0] + (rgb[1] * 256) + (rgb[2] * 256 * 256)
         return colorInt
 
+    def drawLabels(self,):
+        width = self.sizes['labels']['width']
+        height = self.sizes['labels']['height']
+        for counter, kidKey in enumerate(self.interactionKeys):
+            center = self.calcCenter(counter, self.radiusLabels)
+            box = self.slide.Shapes.AddTextbox(
+                Orientation=1,  # msoTextOrientationHorizontal
+                Left=center['x']-width/2.0,
+                Top=center['y']-height/2.0,
+                Width=width,
+                Height=height,
+                )
+            box.TextFrame.TextRange.Text = self.formatLabels(kidKey)
+            box.TextEffect.Alignment = 2    # centered
+            box.TextEffect.FontSize = 10    # centered
+            box.Line.Weight = 3
+            box.Line.ForeColor.RGB = self.hexToInt('000000')
+            self.labelShape[kidKey] = box
+
+    def formatLabels(self, kidKey):
+        labels = self.interactions[kidKey]
+        out = ''
+        formats = {
+            'labelWith':'Cooperation: ',
+            'labelFrom':'Input: ',
+            'labelTo':'Output: ',
+            }
+        for labelKey, labelName in formats.items():
+            try:
+                out = out + labelName + getattr(labels,labelKey) + '\n'
+            except:
+                pass
+        # Remove trailing newline
+        out = out.strip()
+        return out
+
     def connect(self,):
         for counter, kidKey in enumerate(self.interactionKeys):
-            connector = self.slide.Shapes.AddConnector(
-                Type=1, # msoConnectorStraight
-                BeginX=0,
-                BeginY=0,
-                EndX=0,
-                EndY=0
-                )
-            connector.ConnectorFormat.BeginConnect(
-                ConnectedShape=self.centralShape,
-                ConnectionSite=1,
-                )
-            connector.ConnectorFormat.EndConnect(
-                ConnectedShape=self.kidShape[kidKey],
-                ConnectionSite=1,
-                )
-            connector.ConnectorFormat.Parent.RerouteConnections()
-            connector.Line.ForeColor.RGB = self.hexToInt('000000')
-            connector.Line.BeginArrowheadStyle = 3
-            connector.Line.EndArrowheadStyle = 3
-            connector.Line.BeginArrowheadLength = 2
-            connector.Line.EndArrowheadLength = 2
+            pairs = [
+                    [ self.labelShape[kidKey],  self.centralShape ],
+                    [ self.labelShape[kidKey],  self.kidShape[kidKey] ],
+                    ]
+            for start, end in pairs:
+                connector = self.slide.Shapes.AddConnector(
+                    Type=1, # msoConnectorStraight
+                    BeginX=0,
+                    BeginY=0,
+                    EndX=0,
+                    EndY=0
+                    )
+                connector.ConnectorFormat.BeginConnect(
+                    ConnectedShape=start,
+                    ConnectionSite=1,
+                    )
+                connector.ConnectorFormat.EndConnect(
+                    ConnectedShape=end,
+                    ConnectionSite=1,
+                    )
+                connector.ConnectorFormat.Parent.RerouteConnections()
+                connector.Line.ForeColor.RGB = self.hexToInt('000000')
+                # connector.Line.BeginArrowheadStyle = 3
+                # connector.Line.BeginArrowheadLength = 2
+                connector.Line.EndArrowheadStyle = 3
+                connector.Line.EndArrowheadLength = 2
 
-            # Choose Hex-color: https://www.rapidtables.com/web/color/RGB_Color.html
-
-
-    def drawLabels(self,):
-        pass
 
 fileName = 'graph.pptx'
 filePath = os.path.join(os.getcwd(), fileName)
 
-
 slideWidth = 25.4 # cm
 slideHeight = 19.05 # cm
-
 
 app = win32com.client.Dispatch("PowerPoint.Application")
 #app.Visible = False
@@ -239,6 +276,7 @@ p = app.Presentations.Open(
 layoutSlide = p.slides[0].CustomLayout
 
 for keyInteract, valueInteract in interactions.items():
+    print(keyInteract)
     g = ConnectionGraph(
             slide=p.slides.AddSlide(1, layoutSlide),
             # Layouts: https://docs.microsoft.com/de-de/office/vba/api/PowerPoint.PpSlideLayout
@@ -254,11 +292,17 @@ for keyInteract, valueInteract in interactions.items():
                     'width':2,  # cm
                     'height':1, # cm
                     },
+                'labels':{
+                    'width':4,  # cm
+                    'height':2, # cm
+                    },
                 },
             )
     g.drawcentral()
-    g.setRadius(radius = 10.0)  # cm
+    g.setradiusKids(radius = 10.0)  # cm
+    g.setradiusLabels(radius = 5.0)  # cm
     g.drawKids()
+    g.drawLabels()
     g.connect()
 
 # p.Save()
