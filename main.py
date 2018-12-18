@@ -211,6 +211,7 @@ class ConnectionGraph(object):
             box.TextEffect.FontSize = 10    # centered
             box.Line.Weight = 3
             box.Line.ForeColor.RGB = self.hexToInt('000000')
+            box.Fill.BackColor.RGB = self.hexToInt('FFFFFF')
             self.labelShape[kidKey] = box
 
     def formatLabels(self, kidKey):
@@ -233,8 +234,9 @@ class ConnectionGraph(object):
     def connect(self,):
         for counter, kidKey in enumerate(self.interactionKeys):
             pairs = [
-                    [ self.labelShape[kidKey],  self.centralShape ],
-                    [ self.labelShape[kidKey],  self.kidShape[kidKey] ],
+                    # [ self.labelShape[kidKey],  self.centralShape ],
+                    # [ self.labelShape[kidKey],  self.kidShape[kidKey] ],
+                    [ self.centralShape,  self.kidShape[kidKey] ],
                     ]
             for start, end in pairs:
                 connector = self.slide.Shapes.AddConnector(
@@ -254,8 +256,8 @@ class ConnectionGraph(object):
                     )
                 connector.ConnectorFormat.Parent.RerouteConnections()
                 connector.Line.ForeColor.RGB = self.hexToInt('000000')
-                # connector.Line.BeginArrowheadStyle = 3
-                # connector.Line.BeginArrowheadLength = 2
+                connector.Line.BeginArrowheadStyle = 3
+                connector.Line.BeginArrowheadLength = 2
                 connector.Line.EndArrowheadStyle = 3
                 connector.Line.EndArrowheadLength = 2
 
@@ -294,7 +296,7 @@ for keyInteract, valueInteract in interactions.items():
                     },
                 'labels':{
                     'width':4,  # cm
-                    'height':2, # cm
+                    'height':1, # cm
                     },
                 },
             )
@@ -302,8 +304,9 @@ for keyInteract, valueInteract in interactions.items():
     g.setradiusKids(radius = 10.0)  # cm
     g.setradiusLabels(radius = 5.0)  # cm
     g.drawKids()
-    g.drawLabels()
     g.connect()
+    g.drawLabels()
+
 
 # p.Save()
 p.SaveAs(filePath+'test')
